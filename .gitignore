@@ -1,0 +1,22 @@
+# Theos
+.theos/
+obj/
+packages/
+.debmake/
+
+# macOS
+.DS_Store
+
+# Build artifacts
+*.deb
+*.o
+*.dylib
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temp files
+*~
