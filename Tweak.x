@@ -1,12 +1,14 @@
-// LineTweak - Line 메신저 전송취소 메시지 보존
+// LineTweak - Line 메신저 전송취소 메시지 보존 + 광고 차단
 // 기능: 상대방이 전송취소한 메시지를 로컬에 저장하여 계속 볼 수 있게 함
 // 미디어(사진/동영상) 포함
+// 광고 차단 기능
 
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import <CoreData/CoreData.h>
 #import <objc/runtime.h>
 #import <AVFoundation/AVFoundation.h>
+#import <WebKit/WebKit.h>
 
 // 삭제된 메시지 저장 경로
 #define DELETED_MESSAGES_PATH @"/var/mobile/Documents/LineTweak/DeletedMessages.plist"
@@ -19,6 +21,7 @@ static NSInteger maxMessages = 1000;
 static BOOL debugLog = YES;
 static BOOL saveMedia = YES;
 static BOOL compressMedia = YES;
+static BOOL blockAds = YES;
 
 // 설정 로드 함수
 static void loadPreferences() {
@@ -29,10 +32,11 @@ static void loadPreferences() {
     debugLog = prefs[@"debugLog"] ? [prefs[@"debugLog"] boolValue] : YES;
     saveMedia = prefs[@"saveMedia"] ? [prefs[@"saveMedia"] boolValue] : YES;
     compressMedia = prefs[@"compressMedia"] ? [prefs[@"compressMedia"] boolValue] : YES;
+    blockAds = prefs[@"blockAds"] ? [prefs[@"blockAds"] boolValue] : YES;
 
     if (debugLog) {
-        NSLog(@"[LineTweak] 설정 로드: enabled=%d, maxMessages=%ld, debugLog=%d, saveMedia=%d, compress=%d",
-              tweakEnabled, (long)maxMessages, debugLog, saveMedia, compressMedia);
+        NSLog(@"[LineTweak] 설정 로드: enabled=%d, maxMessages=%ld, debugLog=%d, saveMedia=%d, compress=%d, blockAds=%d",
+              tweakEnabled, (long)maxMessages, debugLog, saveMedia, compressMedia, blockAds);
     }
 }
 
@@ -555,6 +559,161 @@ static void loadPreferences() {
     }
 
     return %orig;
+}
+
+%end
+
+// 광고 차단 기능
+// UIView 기반 광고 숨기기
+%hook UIView
+
+- (void)didMoveToSuperview {
+    %orig;
+
+    if (!blockAds) return;
+
+    // 광고 관련 클래스명 패턴 체크
+    NSString *className = NSStringFromClass([self class]);
+    BOOL isAdView = [className rangeOfString:@"Ad" options:NSCaseInsensitiveSearch].location != NSNotFound ||
+                    [className rangeOfString:@"Banner" options:NSCaseInsensitiveSearch].location != NSNotFound ||
+                    [className rangeOfString:@"Sponsor" options:NSCaseInsensitiveSearch].location != NSNotFound ||
+                    [className rangeOfString:@"Promotion" options:NSCaseInsensitiveSearch].location != NSNotFound;
+
+    if (isAdView) {
+        self.hidden = YES;
+        self.alpha = 0.0;
+        self.frame = CGRectZero;
+
+        if (debugLog) {
+            NSLog(@"[LineTweak] 🚫 광고 뷰 숨김: %@", className);
+        }
+    }
+}
+
+%end
+
+// UIViewController 기반 광고 차단
+%hook UIViewController
+
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+
+    if (!blockAds) return;
+
+    NSString *className = NSStringFromClass([self class]);
+    BOOL isAdController = [className rangeOfString:@"Ad" options:NSCaseInsensitiveSearch].location != NSNotFound ||
+                          [className rangeOfString:@"Banner" options:NSCaseInsensitiveSearch].location != NSNotFound ||
+                          [className rangeOfString:@"Sponsor" options:NSCaseInsensitiveSearch].location != NSNotFound ||
+                          [className rangeOfString:@"Promotion" options:NSCaseInsensitiveSearch].location != NSNotFound ||
+                          [className rangeOfString:@"Commercial" options:NSCaseInsensitiveSearch].location != NSNotFound;
+
+    if (isAdController) {
+        if (debugLog) {
+            NSLog(@"[LineTweak] 🚫 광고 컨트롤러 차단: %@", className);
+        }
+
+        // 뷰를 숨김
+        self.view.hidden = YES;
+        self.view.alpha = 0.0;
+
+        // 즉시 dismiss
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.1 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+            if (self.presentingViewController) {
+                [self dismissViewControllerAnimated:NO completion:nil];
+            } else if (self.navigationController) {
+                [self.navigationController popViewControllerAnimated:NO];
+            }
+        });
+    }
+}
+
+%end
+
+// WKWebView 기반 광고 차단 (웹뷰 광고)
+%hook WKWebView
+
+- (void)loadRequest:(NSURLRequest *)request {
+    if (!blockAds) {
+        %orig;
+        return;
+    }
+
+    NSString *urlString = request.URL.absoluteString;
+
+    // 광고 도메인 패턴 체크
+    NSArray *adPatterns = @[@"ad", @"ads", @"banner", @"sponsor", @"promotion",
+                           @"adservice", @"advertising", @"analytics", @"tracking"];
+
+    BOOL isAdURL = NO;
+    for (NSString *pattern in adPatterns) {
+        if ([urlString rangeOfString:pattern options:NSCaseInsensitiveSearch].location != NSNotFound) {
+            isAdURL = YES;
+            break;
+        }
+    }
+
+    if (isAdURL) {
+        if (debugLog) {
+            NSLog(@"[LineTweak] 🚫 광고 URL 차단: %@", urlString);
+        }
+        // 빈 요청으로 대체
+        return;
+    }
+
+    %orig;
+}
+
+%end
+
+// NSObject의 광고 관련 메서드 후킹
+%hook NSObject
+
+- (void)showAd {
+    if (!blockAds) {
+        %orig;
+        return;
+    }
+
+    if (debugLog) {
+        NSLog(@"[LineTweak] 🚫 광고 표시 차단: showAd");
+    }
+    // 광고 표시 차단 - %orig 호출 안 함
+}
+
+- (void)displayAd {
+    if (!blockAds) {
+        %orig;
+        return;
+    }
+
+    if (debugLog) {
+        NSLog(@"[LineTweak] 🚫 광고 표시 차단: displayAd");
+    }
+    // 광고 표시 차단
+}
+
+- (void)loadAd {
+    if (!blockAds) {
+        %orig;
+        return;
+    }
+
+    if (debugLog) {
+        NSLog(@"[LineTweak] 🚫 광고 로드 차단: loadAd");
+    }
+    // 광고 로드 차단
+}
+
+- (void)presentAd {
+    if (!blockAds) {
+        %orig;
+        return;
+    }
+
+    if (debugLog) {
+        NSLog(@"[LineTweak] 🚫 광고 표시 차단: presentAd");
+    }
+    // 광고 표시 차단
 }
 
 %end

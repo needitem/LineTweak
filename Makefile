@@ -10,7 +10,7 @@ TWEAK_NAME = LineTweak
 
 LineTweak_FILES = Tweak.x
 LineTweak_CFLAGS = -fobjc-arc -fno-modules -fno-objc-arc-exceptions
-LineTweak_FRAMEWORKS = UIKit Foundation CoreData AVFoundation
+LineTweak_FRAMEWORKS = UIKit Foundation CoreData AVFoundation WebKit
 
 include $(THEOS_MAKE_PATH)/tweak.mk
 

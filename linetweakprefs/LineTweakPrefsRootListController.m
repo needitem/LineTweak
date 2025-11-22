@@ -135,6 +135,20 @@
         [compressSpec setProperty:@"com.taeho.linetweak/ReloadPrefs" forKey:@"PostNotification"];
         [specs addObject:compressSpec];
 
+        // 광고 차단
+        PSSpecifier *blockAdsSpec = [PSSpecifier preferenceSpecifierNamed:@"광고 차단"
+                                                                   target:self
+                                                                      set:@selector(setPreferenceValue:specifier:)
+                                                                      get:@selector(readPreferenceValue:)
+                                                                   detail:Nil
+                                                                     cell:PSSwitchCell
+                                                                     edit:Nil];
+        [blockAdsSpec setProperty:@"blockAds" forKey:@"key"];
+        [blockAdsSpec setProperty:@YES forKey:@"default"];
+        [blockAdsSpec setProperty:PREFS_PATH forKey:@"defaults"];
+        [blockAdsSpec setProperty:@"com.taeho.linetweak/ReloadPrefs" forKey:@"PostNotification"];
+        [specs addObject:blockAdsSpec];
+
         // 디버그 로그
         PSSpecifier *debugSpec = [PSSpecifier preferenceSpecifierNamed:@"디버그 로그"
                                                                 target:self

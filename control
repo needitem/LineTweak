@@ -1,8 +1,8 @@
 Package: com.taeho.linetweak
 Name: LineTweak
-Version: 1.2.0
+Version: 1.3.0
 Architecture: iphoneos-arm64
-Description: Line 메신저 전송취소 완벽 차단 (사진/동영상 포함)
+Description: Line 메신저 전송취소 차단 + 광고 제거 (사진/동영상 포함)
 Maintainer: Taeho
 Author: Taeho
 Section: Tweaks
